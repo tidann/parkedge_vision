@@ -74,6 +74,9 @@ class PaddleOCREngine:
         all_ocr_lines: list[tuple[list, str, float]] = []
 
         result = self._ocr.ocr(ocr_frame)
+        logger.info("OCR raw result type: %s, truthy: %s", type(result), bool(result))
+        if result:
+            logger.info("result[0] type: %s, keys: %s", type(result[0]), getattr(result[0], 'keys', lambda: 'N/A')() if hasattr(result[0], 'keys') else dir(result[0])[:10])
         if result and result[0]:
             r = result[0]
             rec_texts = r["rec_texts"]
