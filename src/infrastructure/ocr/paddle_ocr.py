@@ -7,8 +7,12 @@ Returns domain-level Detection objects.
 import logging
 import cv2
 import numpy as np
+import paddle
 from paddleocr import PaddleOCR
 from pyzbar import pyzbar
+
+# Force CPU — PP-OCRv5 GPU inference is broken on some GPUs (e.g. RTX 5070 Ti)
+paddle.set_device("cpu")
 
 from src.domain.detection import Detection, BBox
 from src.domain.extraction import extract_from_texts, extract_vin
@@ -73,10 +77,7 @@ class PaddleOCREngine:
         detections = list(_detect_barcodes(frame, frame_index))
         all_ocr_lines: list[tuple[list, str, float]] = []
 
-        result = self._ocr.ocr(ocr_frame)
-        logger.info("OCR raw result type: %s, truthy: %s", type(result), bool(result))
-        if result:
-            logger.info("result[0] type: %s, keys: %s", type(result[0]), getattr(result[0], 'keys', lambda: 'N/A')() if hasattr(result[0], 'keys') else dir(result[0])[:10])
+        result = list(self._ocr.predict(ocr_frame))
         if result and result[0]:
             r = result[0]
             rec_texts = r["rec_texts"]

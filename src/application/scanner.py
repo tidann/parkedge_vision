@@ -61,25 +61,17 @@ class ScannerService:
         return self._running
 
     def _loop(self):
-        logger.warning("=== SCANNER LOOP STARTED === has_frame=%s, frame_index=%d", self._buffer.has_frame, self._buffer.frame_index)
-        scan_count = 0
+        logger.info("Scanner loop started")
         while self._running:
             frame_data = self._buffer.latest()
             if frame_data is None:
-                if scan_count % 100 == 0:
-                    logger.warning("Waiting for frame... has_frame=%s, index=%d, last_read=%d",
-                                   self._buffer.has_frame, self._buffer.frame_index, self._buffer._last_read_index)
-                scan_count += 1
                 time.sleep(0.05)
                 continue
 
             frame, frame_index = frame_data
-            logger.warning("=== SCANNING frame %d (shape=%s) ===", frame_index, frame.shape)
-            try:
-                detections, ocr_lines = self._ocr.process_frame(frame, frame_index)
-                logger.warning("Frame %d RESULT: %d detections, %d OCR lines", frame_index, len(detections), len(ocr_lines))
-            except Exception as e:
-                logger.error("OCR ERROR on frame %d: %s", frame_index, e, exc_info=True)
+            detections, ocr_lines = self._ocr.process_frame(frame, frame_index)
+            if detections:
+                logger.info("Frame %d: %d detections", frame_index, len(detections))
             newly_confirmed = self._tracker.update(detections)
 
             result = FrameResult(
