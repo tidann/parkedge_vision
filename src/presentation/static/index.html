@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ParkEdge Vision</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0f1117;
+      color: #e4e4e7;
+      height: 100vh;
+      overflow: hidden;
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      grid-template-rows: 44px 1fr;
+      height: 100vh;
+    }
+
+    .header {
+      grid-column: 1 / -1;
+      background: #18181b;
+      border-bottom: 1px solid #27272a;
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      gap: 12px;
+    }
+    .header h1 { font-size: 15px; font-weight: 600; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #52525b; }
+    .dot.on { background: #22c55e; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+    .spacer { flex: 1; }
+    .btn {
+      padding: 4px 12px; border: 1px solid #3f3f46; border-radius: 5px;
+      background: transparent; color: #a1a1aa; font-size: 12px; cursor: pointer;
+    }
+    .btn:hover { background: #27272a; color: #fafafa; }
+    .btn.active { background: #22c55e; border-color: #22c55e; color: #000; font-weight: 600; }
+    .btn.active:hover { background: #16a34a; }
+
+    .video-panel {
+      background: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .video-panel img {
+      max-width: 100%;
+      max-height: calc(100vh - 44px);
+      object-fit: contain;
+    }
+    .no-feed { color: #52525b; text-align: center; font-size: 14px; }
+
+    .sidebar {
+      background: #18181b;
+      border-left: 1px solid #27272a;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .section-hdr {
+      padding: 10px 14px;
+      border-bottom: 1px solid #27272a;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      color: #a1a1aa;
+    }
+    .badge {
+      background: #3b82f6; color: #fff; padding: 1px 7px;
+      border-radius: 9px; font-size: 10px; font-weight: 600;
+    }
+
+    .visible-section {
+      border-bottom: 1px solid #27272a;
+      max-height: 180px;
+      overflow-y: auto;
+      padding: 6px;
+    }
+    .visible-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 8px;
+      font-family: 'SF Mono', monospace;
+      font-size: 13px;
+      color: #fafafa;
+      background: #27272a;
+      border-radius: 5px;
+      margin-bottom: 4px;
+    }
+    .visible-item .tag {
+      font-size: 9px;
+      font-weight: 700;
+      padding: 1px 5px;
+      border-radius: 3px;
+      text-transform: uppercase;
+    }
+    .visible-item .tag.plate { background: #052e16; color: #4ade80; }
+    .visible-item .tag.vin { background: #2e1065; color: #a78bfa; }
+    .visible-empty {
+      padding: 12px;
+      text-align: center;
+      font-size: 11px;
+      color: #3f3f46;
+    }
+
+    .confirmed-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 6px;
+    }
+    .confirmed-list::-webkit-scrollbar { width: 5px; }
+    .confirmed-list::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 3px; }
+
+    .det-card {
+      background: #27272a; border-radius: 6px; padding: 10px 12px;
+      margin-bottom: 5px; border-left: 3px solid #3b82f6;
+      animation: slideIn .2s ease-out;
+    }
+    .det-card.vin { border-left-color: #8b5cf6; }
+    .det-card.plate { border-left-color: #22c55e; }
+    @keyframes slideIn { from{transform:translateX(12px);opacity:0} to{transform:none;opacity:1} }
+    .det-card .label {
+      font-size: 9px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .05em; margin-bottom: 2px;
+    }
+    .det-card.vin .label { color: #a78bfa; }
+    .det-card.plate .label { color: #4ade80; }
+    .det-card .value {
+      font-size: 14px; font-weight: 700; font-family: 'SF Mono', monospace;
+      color: #fafafa; letter-spacing: .05em;
+    }
+    .det-card .meta {
+      margin-top: 3px; font-size: 10px; color: #71717a;
+      display: flex; gap: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <div class="header">
+      <div id="dot" class="dot"></div>
+      <h1>ParkEdge Vision</h1>
+      <div class="spacer"></div>
+      <button id="scanBtn" class="btn" onclick="toggleScanner()">Detection OFF</button>
+      <button class="btn" onclick="resetAll()">Reset</button>
+    </div>
+
+    <div class="video-panel">
+      <div id="noFeed" class="no-feed">En attente du flux video...</div>
+      <img id="feed" src="/feed" style="display:none" alt="Live">
+    </div>
+
+    <div class="sidebar">
+      <div class="section-hdr">Visible maintenant</div>
+      <div id="visibleList" class="visible-section">
+        <div class="visible-empty">Aucune detection</div>
+      </div>
+
+      <div class="section-hdr">
+        Confirmes
+        <span id="count" class="badge">0</span>
+      </div>
+      <div id="confirmedList" class="confirmed-list"></div>
+    </div>
+  </div>
+
+<script>
+const WS_URL = `${location.protocol==='https:'?'wss:':'ws:'}//${location.host}/ws`;
+let ws, scanning = false, feedShown = false;
+
+function connectWS() {
+  ws = new WebSocket(WS_URL);
+  ws.onmessage = e => handle(JSON.parse(e.data));
+  ws.onclose = () => setTimeout(connectWS, 2000);
+}
+
+function handle(m) {
+  switch (m.type) {
+    case 'state':
+      renderConfirmed(m.confirmed, m.pending);
+      setScanUI(m.scanning);
+      if (m.feedActive) showFeed();
+      break;
+    case 'frame':
+      showFeed();
+      renderVisible(m.visible || []);
+      if (m.newlyConfirmed?.length) fetchConfirmed();
+      document.getElementById('count').textContent = m.totalConfirmed;
+      break;
+    case 'reset':
+      renderConfirmed([], []);
+      renderVisible([]);
+      break;
+  }
+}
+
+function showFeed() {
+  if (feedShown) return;
+  feedShown = true;
+  document.getElementById('noFeed').style.display = 'none';
+  document.getElementById('feed').style.display = 'block';
+  document.getElementById('dot').classList.add('on');
+}
+
+function fmt(v) { return v.length===7 ? v.slice(0,2)+'-'+v.slice(2,5)+'-'+v.slice(5) : v; }
+
+function renderVisible(items) {
+  const el = document.getElementById('visibleList');
+  if (!items.length) {
+    el.innerHTML = '<div class="visible-empty">Aucune detection</div>';
+    return;
+  }
+  el.innerHTML = items.map(d =>
+    `<div class="visible-item">
+      <span class="tag ${d.kind}">${d.kind==='vin'?'VIN':'PLQ'}</span>
+      ${d.kind==='plate'?fmt(d.value):d.value}
+      <span style="margin-left:auto;color:#71717a;font-size:10px">${Math.round(d.confidence*100)}%</span>
+    </div>`
+  ).join('');
+}
+
+async function fetchConfirmed() {
+  const r = await fetch('/detections');
+  const d = await r.json();
+  renderConfirmed(d.confirmed, d.pending);
+}
+
+function renderConfirmed(confirmed, pending) {
+  const el = document.getElementById('confirmedList');
+  document.getElementById('count').textContent = (confirmed||[]).length;
+  el.innerHTML = (confirmed||[]).map(d => `
+    <div class="det-card ${d.kind}">
+      <div class="label">${d.kind==='vin'?'VIN (Chassis)':'Immatriculation'}</div>
+      <div class="value">${d.kind==='plate'?fmt(d.value):d.value}</div>
+      <div class="meta">
+        <span>${Math.round(d.confidence*100)}%</span>
+        <span>${d.hits}x</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+function setScanUI(on) {
+  scanning = on;
+  const b = document.getElementById('scanBtn');
+  b.textContent = on ? 'Detection ON' : 'Detection OFF';
+  b.classList.toggle('active', on);
+}
+
+async function toggleScanner() {
+  await fetch('/scanner/'+(scanning?'stop':'start'), {method:'POST'});
+  setScanUI(!scanning);
+}
+
+async function resetAll() {
+  await fetch('/reset', {method:'POST'});
+  renderConfirmed([], []);
+  renderVisible([]);
+}
+
+connectWS();
+</script>
+</body>
+</html>

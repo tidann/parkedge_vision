@@ -1,0 +1,33 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "ParkEdge: Server (F5)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/main.py",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK": "True"
+      }
+    },
+    {
+      "name": "ParkEdge: Test video",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/main.py",
+      "args": [
+        "--test",
+        "videos/sample_short_cropped.mp4",
+        "--interval",
+        "30"
+      ],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK": "True"
+      }
+    }
+  ]
+}
