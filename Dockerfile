@@ -8,8 +8,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends libzbar0 libgl1
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Pre-download EasyOCR models at build time
-RUN python -c "import easyocr; easyocr.Reader(['en'], gpu=False)"
+# Pre-download docTR models at build time
+RUN python -c "from doctr.models import ocr_predictor; ocr_predictor(det_arch='db_resnet50', reco_arch='crnn_vgg16_bn', pretrained=True)"
 
 COPY . .
 

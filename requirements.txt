@@ -1,7 +1,8 @@
-easyocr
+python-doctr[torch]
 opencv-python-headless
 fastapi
 uvicorn[standard]
 websockets
 numpy
 pyzbar
+torch

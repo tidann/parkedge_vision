@@ -1,5 +1,5 @@
 """
-Infrastructure — EasyOCR + pyzbar wrapper.
+Infrastructure — docTR + pyzbar wrapper.
 Knows how to extract text and barcodes from a frame.
 Returns domain-level Detection objects.
 """
@@ -7,7 +7,6 @@ Returns domain-level Detection objects.
 import logging
 import cv2
 import numpy as np
-import easyocr
 from pyzbar import pyzbar
 
 from src.domain.detection import Detection, BBox
@@ -42,13 +41,25 @@ def _detect_barcodes(frame: np.ndarray, frame_index: int) -> list[Detection]:
 
 
 class PaddleOCREngine:
-    """OCR engine using EasyOCR (GPU-accelerated via PyTorch)."""
+    """OCR engine using docTR (GPU-accelerated via PyTorch)."""
 
     def __init__(self, ocr_max_width: int = 1280):
         self._max_width = ocr_max_width
-        logger.info("Initializing EasyOCR (max_width=%d)...", ocr_max_width)
-        self._reader = easyocr.Reader(["en"], gpu=True)
-        logger.info("EasyOCR ready (GPU).")
+        logger.info("Initializing docTR (max_width=%d)...", ocr_max_width)
+
+        from doctr.models import ocr_predictor
+        self._predictor = ocr_predictor(
+            det_arch="db_resnet50",
+            reco_arch="crnn_vgg16_bn",
+            pretrained=True,
+        )
+        # Move to GPU if available
+        import torch
+        if torch.cuda.is_available():
+            self._predictor = self._predictor.cuda()
+            logger.info("docTR ready (GPU: %s)", torch.cuda.get_device_name(0))
+        else:
+            logger.info("docTR ready (CPU)")
 
     def process_frame(
         self, frame: np.ndarray, frame_index: int = 0,
@@ -67,19 +78,32 @@ class PaddleOCREngine:
         detections = list(_detect_barcodes(frame, frame_index))
         all_ocr_lines: list[tuple[list, str, float]] = []
 
-        results = self._reader.readtext(ocr_frame)
-        # results: list of (bbox, text, confidence)
-        # bbox: [[x1,y1],[x2,y1],[x2,y2],[x1,y2]]
+        # docTR expects RGB
+        rgb = cv2.cvtColor(ocr_frame, cv2.COLOR_BGR2RGB)
+        result = self._predictor([rgb])
 
+        oh, ow = ocr_frame.shape[:2]
+        scale_up = 1.0 / scale
         texts: list[tuple[str, float]] = []
         bbox_map: dict[str, list] = {}
-        scale_up = 1.0 / scale
 
-        for bbox, text, score in results:
-            bbox_orig = [[int(p[0] * scale_up), int(p[1] * scale_up)] for p in bbox]
-            texts.append((text, score))
-            bbox_map[text] = bbox_orig
-            all_ocr_lines.append((bbox_orig, text, score))
+        for page in result.pages:
+            for block in page.blocks:
+                for line in block.lines:
+                    for word in line.words:
+                        text = word.value
+                        conf = word.confidence
+                        # docTR returns relative coords (0-1), convert to pixel
+                        (x1r, y1r), (x2r, y2r) = word.geometry
+                        x1 = int(x1r * ow * scale_up)
+                        y1 = int(y1r * oh * scale_up)
+                        x2 = int(x2r * ow * scale_up)
+                        y2 = int(y2r * oh * scale_up)
+                        bbox_orig = [[x1, y1], [x2, y1], [x2, y2], [x1, y2]]
+
+                        texts.append((text, conf))
+                        bbox_map[text] = bbox_orig
+                        all_ocr_lines.append((bbox_orig, text, conf))
 
         ocr_dets = extract_from_texts(texts, frame_index=frame_index, bbox_map=bbox_map)
         barcode_values = {d.value for d in detections}

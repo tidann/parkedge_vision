@@ -17,7 +17,7 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
-for name in ("httpx", "httpcore", "easyocr"):
+for name in ("httpx", "httpcore", "doctr"):
     logging.getLogger(name).setLevel(logging.WARNING)
 
 
