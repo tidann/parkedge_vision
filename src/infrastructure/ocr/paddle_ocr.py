@@ -1,5 +1,5 @@
 """
-Infrastructure — PaddleOCR + pyzbar wrapper.
+Infrastructure — EasyOCR + pyzbar wrapper.
 Knows how to extract text and barcodes from a frame.
 Returns domain-level Detection objects.
 """
@@ -7,12 +7,8 @@ Returns domain-level Detection objects.
 import logging
 import cv2
 import numpy as np
-import paddle
-from paddleocr import PaddleOCR
+import easyocr
 from pyzbar import pyzbar
-
-# Force CPU — PP-OCRv5 GPU inference is broken on some GPUs (e.g. RTX 5070 Ti)
-paddle.set_device("cpu")
 
 from src.domain.detection import Detection, BBox
 from src.domain.extraction import extract_from_texts, extract_vin
@@ -46,19 +42,13 @@ def _detect_barcodes(frame: np.ndarray, frame_index: int) -> list[Detection]:
 
 
 class PaddleOCREngine:
+    """OCR engine using EasyOCR (GPU-accelerated via PyTorch)."""
 
     def __init__(self, ocr_max_width: int = 1280):
         self._max_width = ocr_max_width
-        logger.info("Initializing PaddleOCR (max_width=%d)...", ocr_max_width)
-        self._ocr = PaddleOCR(
-            use_doc_orientation_classify=False,
-            use_doc_unwarping=False,
-            use_textline_orientation=False,
-            lang="en",
-            text_det_thresh=0.3,
-            text_recognition_batch_size=6,
-        )
-        logger.info("PaddleOCR ready.")
+        logger.info("Initializing EasyOCR (max_width=%d)...", ocr_max_width)
+        self._reader = easyocr.Reader(["en"], gpu=True)
+        logger.info("EasyOCR ready (GPU).")
 
     def process_frame(
         self, frame: np.ndarray, frame_index: int = 0,
@@ -77,28 +67,24 @@ class PaddleOCREngine:
         detections = list(_detect_barcodes(frame, frame_index))
         all_ocr_lines: list[tuple[list, str, float]] = []
 
-        result = list(self._ocr.predict(ocr_frame))
-        if result and result[0]:
-            r = result[0]
-            rec_texts = r["rec_texts"]
-            rec_scores = r["rec_scores"]
-            dt_polys = r["dt_polys"]
+        results = self._reader.readtext(ocr_frame)
+        # results: list of (bbox, text, confidence)
+        # bbox: [[x1,y1],[x2,y1],[x2,y2],[x1,y2]]
 
-            texts: list[tuple[str, float]] = []
-            bbox_map: dict[str, list] = {}
-            scale_up = 1.0 / scale
+        texts: list[tuple[str, float]] = []
+        bbox_map: dict[str, list] = {}
+        scale_up = 1.0 / scale
 
-            for text, score, poly in zip(rec_texts, rec_scores, dt_polys):
-                bbox = poly.tolist() if hasattr(poly, "tolist") else poly
-                bbox_orig = [[int(p[0] * scale_up), int(p[1] * scale_up)] for p in bbox]
-                texts.append((text, score))
-                bbox_map[text] = bbox_orig
-                all_ocr_lines.append((bbox_orig, text, score))
+        for bbox, text, score in results:
+            bbox_orig = [[int(p[0] * scale_up), int(p[1] * scale_up)] for p in bbox]
+            texts.append((text, score))
+            bbox_map[text] = bbox_orig
+            all_ocr_lines.append((bbox_orig, text, score))
 
-            ocr_dets = extract_from_texts(texts, frame_index=frame_index, bbox_map=bbox_map)
-            barcode_values = {d.value for d in detections}
-            for d in ocr_dets:
-                if d.value not in barcode_values:
-                    detections.append(d)
+        ocr_dets = extract_from_texts(texts, frame_index=frame_index, bbox_map=bbox_map)
+        barcode_values = {d.value for d in detections}
+        for d in ocr_dets:
+            if d.value not in barcode_values:
+                detections.append(d)
 
         return detections, all_ocr_lines

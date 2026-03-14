@@ -1,5 +1,4 @@
-paddlepaddle
-paddleocr
+easyocr
 opencv-python-headless
 fastapi
 uvicorn[standard]

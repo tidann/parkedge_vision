@@ -74,10 +74,13 @@ class ScannerService:
                 logger.info("Frame %d: %d detections", frame_index, len(detections))
             newly_confirmed = self._tracker.update(detections)
 
+            h, w = frame.shape[:2]
             result = FrameResult(
                 frame_index=frame_index,
                 detections=detections,
                 ocr_lines=ocr_lines,
+                frame_width=w,
+                frame_height=h,
             )
 
             for cb in self._callbacks:

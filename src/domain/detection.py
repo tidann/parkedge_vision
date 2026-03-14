@@ -52,3 +52,5 @@ class FrameResult:
     frame_index: int
     detections: list[Detection]
     ocr_lines: list[tuple[list[list[int]], str, float]]  # (bbox, text, confidence)
+    frame_width: int = 0
+    frame_height: int = 0

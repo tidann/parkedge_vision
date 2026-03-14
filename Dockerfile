@@ -1,17 +1,15 @@
-FROM paddlepaddle/paddle:3.0.0-gpu-cuda12.6-cudnn9.5-trt10.7
+FROM pytorch/pytorch:2.5.1-cuda12.4-cudnn9-runtime
 
 WORKDIR /app
 
 # System deps for pyzbar
-RUN apt-get update && apt-get install -y --no-install-recommends libzbar0 && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends libzbar0 libgl1 libglib2.0-0 && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir paddleocr opencv-python-headless fastapi "uvicorn[standard]" websockets numpy pyzbar
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Pre-download OCR models at build time so startup is instant
-RUN PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=True python -c "\
-from paddleocr import PaddleOCR; \
-PaddleOCR(use_doc_orientation_classify=False, use_doc_unwarping=False, use_textline_orientation=False, lang='en')"
+# Pre-download EasyOCR models at build time
+RUN python -c "import easyocr; easyocr.Reader(['en'], gpu=False)"
 
 COPY . .
 

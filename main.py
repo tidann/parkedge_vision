@@ -13,13 +13,11 @@ import argparse
 import logging
 import os
 
-os.environ.setdefault("PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK", "True")
-
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
-for name in ("httpx", "httpcore", "paddle", "paddleocr"):
+for name in ("httpx", "httpcore", "easyocr"):
     logging.getLogger(name).setLevel(logging.WARNING)
 
 

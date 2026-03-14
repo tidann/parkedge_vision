@@ -47,11 +47,25 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      position: relative;
     }
-    .video-panel img {
+    .video-container {
+      position: relative;
+      display: inline-block;
+    }
+    .video-container img {
       max-width: 100%;
       max-height: calc(100vh - 44px);
       object-fit: contain;
+      display: block;
+    }
+    .video-container canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
     }
     .no-feed { color: #52525b; text-align: center; font-size: 14px; }
 
@@ -158,7 +172,10 @@
 
     <div class="video-panel">
       <div id="noFeed" class="no-feed">En attente du flux video...</div>
-      <img id="feed" src="/feed" style="display:none" alt="Live">
+      <div id="videoContainer" class="video-container" style="display:none">
+        <img id="feed" src="/feed" alt="Live">
+        <canvas id="overlay"></canvas>
+      </div>
     </div>
 
     <div class="sidebar">
@@ -178,6 +195,7 @@
 <script>
 const WS_URL = `${location.protocol==='https:'?'wss:':'ws:'}//${location.host}/ws`;
 let ws, scanning = false, feedShown = false;
+let lastOcrLines = [], lastVisible = [], lastFrameSize = null;
 
 function connectWS() {
   ws = new WebSocket(WS_URL);
@@ -194,13 +212,20 @@ function handle(m) {
       break;
     case 'frame':
       showFeed();
-      renderVisible(m.visible || []);
+      lastOcrLines = m.ocrLines || [];
+      lastVisible = m.visible || [];
+      lastFrameSize = m.frameSize || null;
+      renderVisible(lastVisible);
+      drawOverlay();
       if (m.newlyConfirmed?.length) fetchConfirmed();
       document.getElementById('count').textContent = m.totalConfirmed;
       break;
     case 'reset':
       renderConfirmed([], []);
       renderVisible([]);
+      lastOcrLines = [];
+      lastVisible = [];
+      drawOverlay();
       break;
   }
 }
@@ -209,8 +234,68 @@ function showFeed() {
   if (feedShown) return;
   feedShown = true;
   document.getElementById('noFeed').style.display = 'none';
-  document.getElementById('feed').style.display = 'block';
+  document.getElementById('videoContainer').style.display = 'inline-block';
   document.getElementById('dot').classList.add('on');
+}
+
+function drawOverlay() {
+  const canvas = document.getElementById('overlay');
+  const img = document.getElementById('feed');
+  const ctx = canvas.getContext('2d');
+
+  const dispW = img.clientWidth;
+  const dispH = img.clientHeight;
+  canvas.width = dispW;
+  canvas.height = dispH;
+  ctx.clearRect(0, 0, dispW, dispH);
+
+  if (!lastFrameSize) return;
+  const [srcW, srcH] = lastFrameSize;
+  const scaleX = dispW / srcW;
+  const scaleY = dispH / srcH;
+
+  // Draw all OCR lines (gray, thin)
+  ctx.strokeStyle = 'rgba(100, 100, 100, 0.5)';
+  ctx.lineWidth = 1;
+  for (const line of lastOcrLines) {
+    const pts = line.bbox;
+    if (!pts || pts.length < 4) continue;
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0] * scaleX, pts[0][1] * scaleY);
+    for (let i = 1; i < pts.length; i++) {
+      ctx.lineTo(pts[i][0] * scaleX, pts[i][1] * scaleY);
+    }
+    ctx.closePath();
+    ctx.stroke();
+  }
+
+  // Draw matched detections (colored, thick)
+  for (const det of lastVisible) {
+    if (!det.bbox) continue;
+    const pts = det.bbox;
+    const color = det.kind === 'plate' ? '#22c55e' : '#8b5cf6';
+
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0] * scaleX, pts[0][1] * scaleY);
+    for (let i = 1; i < pts.length; i++) {
+      ctx.lineTo(pts[i][0] * scaleX, pts[i][1] * scaleY);
+    }
+    ctx.closePath();
+    ctx.stroke();
+
+    // Label
+    const x = pts[0][0] * scaleX;
+    const y = pts[0][1] * scaleY - 4;
+    const label = (det.kind === 'plate' ? fmt(det.value) : det.value) + ' ' + Math.round(det.confidence * 100) + '%';
+    ctx.font = 'bold 12px SF Mono, monospace';
+    const tw = ctx.measureText(label).width;
+    ctx.fillStyle = color;
+    ctx.fillRect(x, y - 13, tw + 8, 16);
+    ctx.fillStyle = '#000';
+    ctx.fillText(label, x + 4, y);
+  }
 }
 
 function fmt(v) { return v.length===7 ? v.slice(0,2)+'-'+v.slice(2,5)+'-'+v.slice(5) : v; }
@@ -267,7 +352,13 @@ async function resetAll() {
   await fetch('/reset', {method:'POST'});
   renderConfirmed([], []);
   renderVisible([]);
+  lastOcrLines = [];
+  lastVisible = [];
+  drawOverlay();
 }
+
+// Redraw overlay on window resize
+window.addEventListener('resize', drawOverlay);
 
 connectWS();
 </script>

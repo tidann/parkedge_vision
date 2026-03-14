@@ -46,9 +46,17 @@ def _on_scan_result(result: FrameResult, newly_confirmed: list):
         "type": "frame",
         "frameIndex": result.frame_index,
         "visible": [
-            {"value": d.value, "kind": d.kind, "confidence": round(d.confidence, 3)}
+            {
+                "value": d.value, "kind": d.kind, "confidence": round(d.confidence, 3),
+                "bbox": d.bbox.to_list() if d.bbox else None,
+            }
             for d in result.detections
         ],
+        "ocrLines": [
+            {"bbox": bbox, "text": text, "confidence": round(conf, 3)}
+            for bbox, text, conf in result.ocr_lines
+        ],
+        "frameSize": [result.frame_width, result.frame_height] if result.frame_width else None,
         "newlyConfirmed": [v.to_dict() for v in newly_confirmed],
         "totalConfirmed": len(tracker.confirmed),
         "totalPending": len(tracker.pending),
