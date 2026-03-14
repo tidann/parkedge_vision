@@ -91,7 +91,7 @@ async def lifespan(app: FastAPI):
     global scanner
     logger.info("Starting OCR engine...")
     ocr_engine = PaddleOCREngine(ocr_max_width=1280)
-    scanner = ScannerService(frame_buffer, ocr_engine, tracker, scan_interval_ms=1000)
+    scanner = ScannerService(frame_buffer, ocr_engine, tracker, scan_interval_ms=200)
     scanner.on_result(_on_scan_result)
     broadcast_task = asyncio.create_task(_poll_and_broadcast())
     logger.info("Server ready. Waiting for video feed...")

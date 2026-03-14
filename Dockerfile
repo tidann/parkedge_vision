@@ -9,7 +9,8 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Pre-download docTR models at build time
-RUN python -c "from doctr.models import ocr_predictor; ocr_predictor(det_arch='db_resnet50', reco_arch='crnn_vgg16_bn', pretrained=True)"
+ENV USE_TORCH=1
+RUN python -c "from doctr.models import ocr_predictor; ocr_predictor(det_arch='db_mobilenet_v3_large', reco_arch='crnn_mobilenet_v3_large', pretrained=True)"
 
 COPY . .
 

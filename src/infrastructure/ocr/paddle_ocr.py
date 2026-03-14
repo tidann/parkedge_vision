@@ -4,6 +4,9 @@ Knows how to extract text and barcodes from a frame.
 Returns domain-level Detection objects.
 """
 
+import os
+os.environ["USE_TORCH"] = "1"
+
 import logging
 import cv2
 import numpy as np
@@ -47,17 +50,17 @@ class PaddleOCREngine:
         self._max_width = ocr_max_width
         logger.info("Initializing docTR (max_width=%d)...", ocr_max_width)
 
+        import torch
         from doctr.models import ocr_predictor
+
         self._predictor = ocr_predictor(
-            det_arch="db_resnet50",
-            reco_arch="crnn_vgg16_bn",
+            det_arch="db_mobilenet_v3_large",
+            reco_arch="crnn_mobilenet_v3_large",
             pretrained=True,
         )
-        # Move to GPU if available
-        import torch
         if torch.cuda.is_available():
-            self._predictor = self._predictor.cuda()
-            logger.info("docTR ready (GPU: %s)", torch.cuda.get_device_name(0))
+            self._predictor = self._predictor.cuda().half()
+            logger.info("docTR ready (GPU FP16: %s)", torch.cuda.get_device_name(0))
         else:
             logger.info("docTR ready (CPU)")
 
