@@ -30,7 +30,7 @@ def main():
     args = parser.parse_args()
 
     import uvicorn
-    uvicorn.run("src.presentation.server:app", host=args.host, port=args.port, reload=False)
+    uvicorn.run("src.presentation.server:app", host=args.host, port=args.port, reload=False, log_level="warning")
 
 
 if __name__ == "__main__":
